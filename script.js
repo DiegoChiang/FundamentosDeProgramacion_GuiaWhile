@@ -1,3 +1,167 @@
+
+function snapshotTrace(state, extra = {}) {
+  return { ...state, ...extra };
+}
+
+function renderTraceConsole(lines) {
+  if (!lines || !lines.length) return '<div class="console-line muted">Aún no hay salida.</div>';
+  return lines.map(([kind, txt]) => `<div class="console-line ${kind}">${txt}</div>`).join('');
+}
+
+function buildProductTrace() {
+  const trace = [];
+  const state = { codigo:'—', nombre:'—', cantidad:0, ultimoCodigo:'—', ultimoNombre:'—' };
+  const consoleLines = [];
+  const push = (line, msg, test='—', bool=null, phase='') => trace.push(snapshotTrace(state, {line,msg,test,bool,phase,console:[...consoleLines]}));
+
+  push(0, 'Inicializamos el contador de productos en 0.', '—', null, 'Inicialización');
+  state.codigo = 'VAL123'; consoleLines.push(['input','Ingrese código de producto 1: VAL123']);
+  push(1, 'Leemos el primer código antes de evaluar el while.', '—', null, 'Lectura inicial');
+
+  const products = [
+    ['VAL123','Válvula Neumática','FTR456',2],
+    ['FTR456','Filtro Hidráulico','BMB321',3],
+    ['BMB321','Bomba Centrífuga','FIN',4]
+  ];
+  for (const [codigo,nombre,siguiente,nroSig] of products) {
+    state.codigo = codigo;
+    push(2, `${codigo} no es FIN, por eso el ciclo entra.`, `${codigo} != FIN`, true, 'Evaluar condición');
+    state.nombre = nombre; consoleLines.push(['input',`Ingrese nombre del producto ${state.cantidad+1}: ${nombre}`]);
+    push(3, `Leemos el nombre asociado al código ${codigo}.`, `${codigo} != FIN`, true, 'Leer nombre');
+    state.cantidad += 1;
+    push(4, `Incrementamos el contador: cantidad = ${state.cantidad}.`, `${codigo} != FIN`, true, 'Actualizar contador');
+    state.ultimoCodigo = codigo;
+    push(5, `Guardamos ${codigo} como último código válido.`, `${codigo} != FIN`, true, 'Guardar último código');
+    state.ultimoNombre = nombre;
+    push(6, `Guardamos “${nombre}” como último nombre válido.`, `${codigo} != FIN`, true, 'Guardar último nombre');
+    state.codigo = siguiente; state.nombre = '—'; consoleLines.push(['input',`Ingrese código de producto ${nroSig}: ${siguiente}`]);
+    push(7, `Leemos el siguiente código para volver a evaluar la condición.`, `${siguiente} != FIN`, siguiente !== 'FIN', 'Leer siguiente código');
+  }
+
+  push(2, 'Ahora el código es FIN: la condición es falsa y no se procesa otro producto.', 'FIN != FIN', false, 'Evaluar condición');
+  consoleLines.push(['output',`Total de productos: ${state.cantidad}`]);
+  consoleLines.push(['output',`Código: ${state.ultimoCodigo}`]);
+  consoleLines.push(['output',`Nombre: ${state.ultimoNombre}`]);
+  push(8, 'El while terminó. Mostramos el resumen con los datos acumulados.', 'FIN != FIN', false, 'Salida');
+  return trace;
+}
+
+function buildTemperatureTrace() {
+  const trace = [];
+  const state = { temp:'—', max:'—', suma:0, cont:0, prom:'—' };
+  const consoleLines = [];
+  const push = (line,msg,test='—',bool=null,phase='') => trace.push(snapshotTrace(state,{line,msg,test,bool,phase,console:[...consoleLines]}));
+  push(0,'Inicializamos suma y contador en 0.','—',null,'Inicialización');
+  state.temp = 75; consoleLines.push(['input','Temperatura 1: 75 °C']);
+  push(1,'Leemos la primera temperatura antes de entrar al while.','—',null,'Lectura inicial');
+
+  const temps=[75,78,76,81,89];
+  const nexts=[78,76,81,89,95];
+  for(let k=0;k<temps.length;k++){
+    const t=temps[k]; state.temp=t;
+    push(2,`${t} ≤ 90: la condición es verdadera.`,`${t} <= 90`,true,'Evaluar while');
+    state.suma += t;
+    push(3,`Sumamos ${t}: suma = ${state.suma}.`,`${t} <= 90`,true,'Acumular');
+    state.cont += 1;
+    push(4,`Incrementamos el contador: contador = ${state.cont}.`,`${t} <= 90`,true,'Contar dato válido');
+    const ifok = state.cont===1 || state.max==='—' || t>state.max;
+    const expr = state.cont===1 ? `contador == 1` : `${t} > ${state.max}`;
+    push(5,`Evaluamos si debemos actualizar el máximo.`,expr,ifok,'Evaluar if');
+    if(ifok){
+      state.max=t;
+      push(6,`Actualizamos máximo = ${t}.`,expr,true,'Actualizar máximo');
+    }
+    state.temp=nexts[k]; consoleLines.push(['input',`Temperatura ${k+2}: ${nexts[k]} °C`]);
+    push(7,`Leemos la siguiente temperatura: ${nexts[k]} °C.`,`${nexts[k]} <= 90`,nexts[k]<=90,'Leer siguiente dato');
+  }
+  push(2,'95 > 90: la condición del while es falsa. 95 no entra a suma, contador ni máximo.','95 <= 90',false,'Evaluar while');
+  consoleLines.push(['alert','Alerta: se excedió la temperatura límite']);
+  push(8,'Mostramos la alerta al salir del ciclo.','95 <= 90',false,'Alerta');
+  state.prom = (state.suma/state.cont).toFixed(1);
+  push(9,`Calculamos promedio = ${state.suma} / ${state.cont} = ${state.prom}.`,'—',null,'Calcular promedio');
+  consoleLines.push(['output',`Temperatura máxima: ${state.max}`]);
+  push(10,`Mostramos la temperatura máxima: ${state.max}.`,'—',null,'Salida');
+  consoleLines.push(['output',`Temperatura promedio: ${state.prom}`]);
+  push(11,`Mostramos el promedio final: ${state.prom}.`,'—',null,'Salida');
+  return trace;
+}
+
+function buildWorkerTrace() {
+  const trace=[];
+  const state={worker:'—',hrs:'—',count:0,total:0};
+  const consoleLines=[];
+  const push=(line,msg,test='—',bool=null,phase='')=>trace.push(snapshotTrace(state,{line,msg,test,bool,phase,console:[...consoleLines]}));
+  push(0,'Inicializamos cantidad y totalHoras en 0.','—',null,'Inicialización');
+  state.worker='Juan'; consoleLines.push(['input','Trabajador 1: Juan']);
+  push(1,'Leemos el primer trabajador antes del while.','—',null,'Lectura inicial');
+
+  const workers=[
+    {name:'Juan',attempts:[5,7],next:'Ana',nextN:2},
+    {name:'Ana',attempts:[8],next:'Luis',nextN:3},
+    {name:'Luis',attempts:[13,9],next:'FIN',nextN:4}
+  ];
+  for(const w of workers){
+    state.worker=w.name;
+    push(2,`${w.name} != FIN, por eso entramos al ciclo.`,`${w.name} != FIN`,true,'Evaluar while externo');
+    state.hrs=w.attempts[0]; consoleLines.push(['input',`Horas: ${w.attempts[0]}`]);
+    push(3,`Leemos las horas de ${w.name}: ${state.hrs}.`,'—',null,'Leer horas');
+    let idx=0;
+    while(true){
+      const invalid=state.hrs<6 || state.hrs>12;
+      push(4,`Evaluamos si ${state.hrs} está fuera del rango 6–12.`,`${state.hrs} < 6 or ${state.hrs} > 12`,invalid,'Validar horas');
+      if(!invalid) break;
+      consoleLines.push(['alert','Hora incorrecta, ingrésela nuevamente.']);
+      push(5,'La hora es inválida, por eso mostramos el mensaje de error.',`${state.hrs} < 6 or ${state.hrs} > 12`,true,'Mensaje de error');
+      idx += 1; state.hrs=w.attempts[idx]; consoleLines.push(['input',`Horas: ${state.hrs}`]);
+      push(6,`Volvemos a leer las horas. Nuevo valor: ${state.hrs}.`,'—',null,'Reingresar horas');
+    }
+    state.count += 1;
+    push(7,`Como las horas son válidas, cantidad = ${state.count}.`,'—',null,'Actualizar contador');
+    state.total += state.hrs;
+    push(8,`Sumamos las horas: totalHoras = ${state.total}.`,'—',null,'Acumular horas');
+    state.worker=w.next; state.hrs='—'; consoleLines.push(['input',`Trabajador ${w.nextN}: ${w.next}`]);
+    push(9,`Leemos el siguiente nombre para volver a evaluar el while externo.`,'—',null,'Leer siguiente trabajador');
+  }
+  push(2,'FIN == FIN: la condición externa es falsa y terminamos.','FIN != FIN',false,'Evaluar while externo');
+  consoleLines.push(['output',`Cantidad de trabajadores: ${state.count}`]);
+  push(10,`Mostramos la cantidad final de trabajadores: ${state.count}.`,'—',null,'Salida');
+  consoleLines.push(['output',`Total de horas: ${state.total}`]);
+  push(11,`Mostramos el total de horas acumuladas: ${state.total}.`,'—',null,'Salida');
+  return trace;
+}
+
+function buildInspectionTrace() {
+  const trace=[];
+  const state={approved:0,rejected:0,total:0,pct:'—',estado:'—'};
+  const consoleLines=[];
+  const push=(line,msg,test='—',bool=null,phase='')=>trace.push(snapshotTrace(state,{line,msg,test,bool,phase,console:[...consoleLines]}));
+  push(0,'Inicializamos aprobados en 0.','—',null,'Inicialización');
+  push(1,'Inicializamos rechazados en 0.','—',null,'Inicialización');
+  const seq=['R','A','R','A','A','A','A'];
+  for(let i=0;i<seq.length;i++){
+    push(2,`Evaluamos ${state.approved} < 5. Todavía ${state.approved<5?'seguimos':'terminamos'}.`,`${state.approved} < 5`,state.approved<5,'Evaluar while');
+    state.estado=seq[i]; state.total=i+1; consoleLines.push(['input',`Producto ${i+1}: ${seq[i]}`]);
+    push(3,`Leemos el estado del producto ${i+1}: ${seq[i]}.`,'—',null,'Leer estado');
+    const isA=seq[i]==='A';
+    push(4,`Evaluamos si el estado es A.`,`${seq[i]} == A`,isA,'Evaluar if');
+    if(isA){
+      state.approved += 1;
+      push(5,`Es aprobado: aprobados = ${state.approved}.`,'—',null,'Actualizar contador aprobados');
+    } else {
+      push(6,'La condición del if es falsa, así que entramos al else.','—',null,'Else');
+      state.rejected += 1;
+      push(7,`Es rechazado: rechazados = ${state.rejected}.`,'—',null,'Actualizar rechazados');
+    }
+  }
+  push(2,`Evaluamos ${state.approved} < 5. Ahora es falso y el while termina.`,`${state.approved} < 5`,false,'Evaluar while');
+  state.pct=((state.approved/(state.approved+state.rejected))*100).toFixed(2);
+  push(8,`Calculamos porcentaje = 5 / 7 × 100 = ${state.pct}%.`,'—',null,'Calcular porcentaje');
+  consoleLines.push(['output',`Aprobados: ${state.approved}`]); push(9,'Mostramos aprobados.','—',null,'Salida');
+  consoleLines.push(['output',`Rechazados: ${state.rejected}`]); push(10,'Mostramos rechazados.','—',null,'Salida');
+  consoleLines.push(['output',`% Aprobados: ${state.pct}`]); push(11,'Mostramos el porcentaje final.','—',null,'Salida');
+  return trace;
+}
+
 const slides = [
   {
     title: "¿Qué hace realmente un while?",
@@ -115,18 +279,10 @@ const slides = [
   },
   {
     title: "Ejercicio 1 · Productos hasta FIN",
-    short: "Centinela textual",
+    short: "Centinela textual · línea por línea",
     render(step) {
-      const traces = [
-        {codigo:'—', nombre:'—', cantidad:0, ultimoCodigo:'—', ultimoNombre:'—', cond:'?', bool:null, active:0, msg:'Primero necesitamos un dato que pueda detener el ciclo.'},
-        {codigo:'VAL123', nombre:'—', cantidad:0, ultimoCodigo:'—', ultimoNombre:'—', cond:'VAL123 != FIN', bool:true, active:1, msg:'Leemos el código ANTES del while. Como no es FIN, entramos.'},
-        {codigo:'VAL123', nombre:'Válvula Neumática', cantidad:1, ultimoCodigo:'VAL123', ultimoNombre:'Válvula Neumática', cond:'VAL123 != FIN', bool:true, active:3, msg:'Procesamos el producto: pedimos nombre, contamos y lo guardamos como “último”.'},
-        {codigo:'FTR456', nombre:'Filtro Hidráulico', cantidad:2, ultimoCodigo:'FTR456', ultimoNombre:'Filtro Hidráulico', cond:'FTR456 != FIN', bool:true, active:4, msg:'Al final del ciclo se lee el siguiente código. La condición se vuelve a evaluar.'},
-        {codigo:'BMB321', nombre:'Bomba Centrífuga', cantidad:3, ultimoCodigo:'BMB321', ultimoNombre:'Bomba Centrífuga', cond:'BMB321 != FIN', bool:true, active:4, msg:'Tercera repetición: cantidad llega a 3 y se actualiza el último producto.'},
-        {codigo:'FIN', nombre:'—', cantidad:3, ultimoCodigo:'BMB321', ultimoNombre:'Bomba Centrífuga', cond:'FIN != FIN', bool:false, active:1, msg:'FIN NO se procesa como producto. Solo hace falsa la condición.'},
-        {codigo:'FIN', nombre:'—', cantidad:3, ultimoCodigo:'BMB321', ultimoNombre:'Bomba Centrífuga', cond:'FIN != FIN', bool:false, active:5, msg:'El ciclo termina y mostramos el resumen.'}
-      ];
-      const t = traces[Math.min(step, traces.length-1)];
+      const trace = buildProductTrace();
+      const t = trace[Math.min(step, trace.length - 1)];
       const code = [
         `cantidad = 0`,
         `codigo = input(<span class="str">"Código: "</span>)`,
@@ -138,47 +294,32 @@ const slides = [
         `&nbsp;&nbsp;&nbsp;&nbsp;codigo = input(<span class="str">"Código: "</span>)`,
         `print(cantidad, ultimoCodigo, ultimoNombre)`
       ];
-      const lineMap = [1,1,2,4,7,2,8];
       return `
-        <div class="slide-kicker">03 · Ejercicio 1 · Centinela textual</div>
+        <div class="slide-kicker">03 · Ejercicio 1 · Ejecución línea por línea</div>
         <h2 class="slide-title">Productos hasta que el código sea <span class="highlight">FIN</span></h2>
-        <div class="logic-board">
+        <div class="logic-board compact-exercise">
           <div>
-            <div class="micro-tag" style="margin-bottom:10px">CÓDIGO PYTHON</div>
-            <div class="code">${code.map((l,i)=>`<span class="code-line ${i===lineMap[Math.min(step,lineMap.length-1)]?'active':''}">${l}</span>`).join('')}</div>
-            <div class="step-callout"><strong>Paso ${step+1}</strong><span>${t.msg}</span></div>
+            <div class="micro-tag" style="margin-bottom:8px">CÓDIGO PYTHON · LÍNEA ACTUAL</div>
+            <div class="code">${code.map((l,i)=>`<span class="code-line ${i===t.line?'active':''}">${l}</span>`).join('')}</div>
+            <div class="step-callout"><strong>${t.phase}</strong><span>${t.msg}</span></div>
           </div>
           <div class="trace-panel">
-            <div class="condition-box"><span class="condition-expression">${t.cond}</span>${t.bool===null?'<span class="bool-pill">AÚN NO</span>':`<span class="bool-pill ${t.bool?'bool-true':'bool-false'}">${t.bool?'VERDADERO':'FALSO'}</span>`}</div>
+            <div class="condition-box"><span class="condition-expression">${t.test}</span>${t.bool===null?'<span class="bool-pill">—</span>':`<span class="bool-pill ${t.bool?'bool-true':'bool-false'}">${t.bool?'VERDADERO':'FALSO'}</span>`}</div>
             <div class="var-grid">
-              ${varBox('codigo', t.codigo)}
-              ${varBox('nombre', t.nombre)}
-              ${varBox('cantidad', t.cantidad)}
-              ${varBox('ultimoCodigo', t.ultimoCodigo)}
-              ${varBox('ultimoNombre', t.ultimoNombre)}
+              ${varBox('codigo', t.codigo)} ${varBox('nombre', t.nombre)} ${varBox('cantidad', t.cantidad)} ${varBox('ultimoCodigo', t.ultimoCodigo)} ${varBox('ultimoNombre', t.ultimoNombre)}
             </div>
-            <div class="console">${productConsole(step)}</div>
+            <div class="console">${renderTraceConsole(t.console)}</div>
           </div>
-        </div>
-      `;
+        </div>`;
     },
-    steps: 7
+    steps: buildProductTrace().length
   },
   {
     title: "Ejercicio 2 · Temperaturas hasta > 90°C",
-    short: "Dato de corte no se procesa",
+    short: "Límite numérico · línea por línea",
     render(step) {
-      const states = [
-        {temp:'—', max:'—', suma:0, cont:0, prom:'—', bool:null, note:'Antes de leer temperaturas, necesitamos preparar contador, suma y máximo.'},
-        {temp:75, max:75, suma:75, cont:1, prom:'—', bool:true, note:'75 ≤ 90, así que esta temperatura SÍ cuenta.'},
-        {temp:78, max:78, suma:153, cont:2, prom:'—', bool:true, note:'78 supera al máximo anterior (75), por eso máximo = 78.'},
-        {temp:76, max:78, suma:229, cont:3, prom:'—', bool:true, note:'76 se suma, pero no cambia el máximo.'},
-        {temp:81, max:81, suma:310, cont:4, prom:'—', bool:true, note:'81 se vuelve el nuevo máximo.'},
-        {temp:89, max:89, suma:399, cont:5, prom:'—', bool:true, note:'Hasta aquí todo sigue siendo válido.'},
-        {temp:95, max:89, suma:399, cont:5, prom:'—', bool:false, note:'95 provoca la alerta. NO se suma, NO aumenta el contador, NO cambia el máximo.'},
-        {temp:95, max:89, suma:399, cont:5, prom:'79.8', bool:false, note:'Al salir: promedio = 399 / 5 = 79.8.'}
-      ];
-      const s = states[Math.min(step, states.length-1)];
+      const trace = buildTemperatureTrace();
+      const s = trace[Math.min(step, trace.length - 1)];
       const code = [
         `suma = 0; contador = 0`,
         `temperatura = float(input(<span class="str">"Temperatura: "</span>))`,
@@ -188,129 +329,104 @@ const slides = [
         `&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> contador == 1 <span class="kw">or</span> temperatura &gt; maximo:`,
         `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;maximo = temperatura`,
         `&nbsp;&nbsp;&nbsp;&nbsp;temperatura = float(input(<span class="str">"Temperatura: "</span>))`,
-        `promedio = suma / contador`
+        `print(<span class="str">"Alerta: se excedió la temperatura límite"</span>)`,
+        `promedio = suma / contador`,
+        `print(<span class="str">"Temperatura máxima:"</span>, maximo)`,
+        `print(<span class="str">"Temperatura promedio:"</span>, promedio)`
       ];
-      const activeLines = [0,3,5,3,5,5,2,8];
       return `
-        <div class="slide-kicker">04 · Ejercicio 2 · Límite numérico</div>
-        <h2 class="slide-title">La temperatura que rompe la condición <span class="danger">no entra al cálculo</span></h2>
-        <div class="logic-board">
+        <div class="slide-kicker">04 · Ejercicio 2 · Ejecución línea por línea</div>
+        <h2 class="slide-title">La temperatura de corte <span class="danger">no se procesa</span></h2>
+        <div class="logic-board compact-exercise">
           <div>
-            <div class="micro-tag" style="margin-bottom:10px">CÓDIGO PYTHON</div>
-            <div class="code">${code.map((l,i)=>`<span class="code-line ${i===activeLines[Math.min(step,activeLines.length-1)]?'active':''}">${l}</span>`).join('')}</div>
-            <div class="step-callout"><strong>Clave del ejercicio</strong><span>${s.note}</span></div>
+            <div class="micro-tag" style="margin-bottom:8px">CÓDIGO PYTHON · LÍNEA ACTUAL</div>
+            <div class="code">${code.map((l,i)=>`<span class="code-line ${i===s.line?'active':''}">${l}</span>`).join('')}</div>
+            <div class="step-callout"><strong>${s.phase}</strong><span>${s.msg}</span></div>
           </div>
           <div class="trace-panel">
-            <div class="condition-box"><span class="condition-expression">${s.temp==='—'?'temperatura <= 90':`${s.temp} <= 90`}</span>${s.bool===null?'<span class="bool-pill">AÚN NO</span>':`<span class="bool-pill ${s.bool?'bool-true':'bool-false'}">${s.bool?'VERDADERO':'FALSO'}</span>`}</div>
-            <div class="var-grid">
-              ${varBox('temperatura', s.temp)}
-              ${varBox('máximo', s.max)}
-              ${varBox('suma', s.suma)}
-              ${varBox('contador', s.cont)}
-              ${varBox('promedio', s.prom)}
-            </div>
-            <div class="console">${temperatureConsole(step)}</div>
+            <div class="condition-box"><span class="condition-expression">${s.test}</span>${s.bool===null?'<span class="bool-pill">—</span>':`<span class="bool-pill ${s.bool?'bool-true':'bool-false'}">${s.bool?'VERDADERO':'FALSO'}</span>`}</div>
+            <div class="var-grid">${varBox('temperatura',s.temp)} ${varBox('máximo',s.max)} ${varBox('suma',s.suma)} ${varBox('contador',s.cont)} ${varBox('promedio',s.prom)}</div>
+            <div class="console">${renderTraceConsole(s.console)}</div>
           </div>
-        </div>
-      `;
+        </div>`;
     },
-    steps: 8
+    steps: buildTemperatureTrace().length
   },
   {
     title: "Ejercicio 4 · Validación dentro de un while",
-    short: "Dos niveles de repetición",
+    short: "Validación · línea por línea",
     render(step) {
-      const states = [
-        {worker:'—', hrs:'—', count:0,total:0,outer:'?',inner:'?', note:'Hay un ciclo grande para trabajadores y una validación para horas.'},
-        {worker:'Juan', hrs:5, count:0,total:0,outer:'Juan != FIN',inner:'5 está entre 6 y 12', note:'Juan no termina el proceso, pero 5 horas es inválido.'},
-        {worker:'Juan', hrs:7, count:1,total:7,outer:'Juan != FIN',inner:'7 está entre 6 y 12', note:'Cuando la hora es válida, recién contamos al trabajador y sumamos sus horas.'},
-        {worker:'Ana', hrs:8, count:2,total:15,outer:'Ana != FIN',inner:'8 está entre 6 y 12', note:'Ana entra directamente: 8 es válido.'},
-        {worker:'Luis', hrs:13, count:2,total:15,outer:'Luis != FIN',inner:'13 está entre 6 y 12', note:'13 es inválido: todavía no contamos a Luis.'},
-        {worker:'Luis', hrs:9, count:3,total:24,outer:'Luis != FIN',inner:'9 está entre 6 y 12', note:'Con 9 horas, Luis pasa la validación.'},
-        {worker:'FIN', hrs:'—', count:3,total:24,outer:'FIN != FIN',inner:'—', note:'FIN corta el ciclo externo. Resultado: 3 trabajadores y 24 horas.'}
+      const trace = buildWorkerTrace();
+      const s = trace[Math.min(step, trace.length - 1)];
+      const code = [
+        `cantidad = 0; totalHoras = 0`,
+        `nombre = input(<span class="str">"Trabajador: "</span>)`,
+        `<span class="kw">while</span> nombre != <span class="str">"FIN"</span>:`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;horas = int(input(<span class="str">"Horas: "</span>))`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">while</span> horas &lt; 6 <span class="kw">or</span> horas &gt; 12:`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(<span class="str">"Hora incorrecta"</span>)`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;horas = int(input(<span class="str">"Horas: "</span>))`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;cantidad = cantidad + 1`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;totalHoras = totalHoras + horas`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;nombre = input(<span class="str">"Trabajador: "</span>)`,
+        `print(<span class="str">"Cantidad de trabajadores:"</span>, cantidad)`,
+        `print(<span class="str">"Total de horas:"</span>, totalHoras)`
       ];
-      const s = states[Math.min(step,states.length-1)];
-      const innerOk = typeof s.hrs === 'number' ? s.hrs>=6 && s.hrs<=12 : null;
-      const outerOk = s.worker !== '—' ? s.worker !== 'FIN' : null;
       return `
-        <div class="slide-kicker">05 · Ejercicio 4 · Validación</div>
-        <h2 class="slide-title">Un <span class="highlight">while</span> puede controlar el proceso y otro validar el dato</h2>
-        <div class="grid-2">
+        <div class="slide-kicker">05 · Ejercicio 4 · Ejecución línea por línea</div>
+        <h2 class="slide-title">Un while recorre trabajadores y otro <span class="highlight">valida las horas</span></h2>
+        <div class="logic-board compact-exercise">
           <div>
-            <div class="micro-tag" style="margin-bottom:10px">CÓDIGO PYTHON</div>
-            <div class="code">
-              <span class="code-line">nombre = input(<span class="str">"Trabajador: "</span>)</span>
-              <span class="code-line ${step===6?'active':''}"><span class="kw">while</span> nombre != <span class="str">"FIN"</span>:</span>
-              <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;horas = int(input(<span class="str">"Horas: "</span>))</span>
-              <span class="code-line ${step===1||step===4?'active':''}">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">while</span> horas &lt; 6 <span class="kw">or</span> horas &gt; 12:</span>
-              <span class="code-line ${step===1||step===4?'active':''}">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(<span class="str">"Hora incorrecta"</span>)</span>
-              <span class="code-line ${step===1||step===4?'active':''}">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;horas = int(input(<span class="str">"Horas: "</span>))</span>
-              <span class="code-line ${step===2||step===3||step===5?'active':''}">&nbsp;&nbsp;&nbsp;&nbsp;cantidad = cantidad + 1</span>
-              <span class="code-line ${step===2||step===3||step===5?'active':''}">&nbsp;&nbsp;&nbsp;&nbsp;totalHoras = totalHoras + horas</span>
-              <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;nombre = input(<span class="str">"Trabajador: "</span>)</span>
-            </div>
-            <div class="step-callout"><strong>Lectura pedagógica</strong><span>${s.note}</span></div>
+            <div class="micro-tag" style="margin-bottom:8px">CÓDIGO PYTHON · LÍNEA ACTUAL</div>
+            <div class="code">${code.map((l,i)=>`<span class="code-line ${i===s.line?'active':''}">${l}</span>`).join('')}</div>
+            <div class="step-callout"><strong>${s.phase}</strong><span>${s.msg}</span></div>
           </div>
           <div class="trace-panel">
-            <div class="condition-box"><span class="condition-expression">${s.outer}</span>${outerOk===null?'<span class="bool-pill">—</span>':`<span class="bool-pill ${outerOk?'bool-true':'bool-false'}">${outerOk?'VERDADERO':'FALSO'}</span>`}</div>
-            <div class="condition-box"><span class="condition-expression">${s.inner}</span>${innerOk===null?'<span class="bool-pill">—</span>':`<span class="bool-pill ${innerOk?'bool-true':'bool-false'}">${innerOk?'VÁLIDO':'INVÁLIDO'}</span>`}</div>
-            <div class="var-grid">
-              ${varBox('trabajador', s.worker)}
-              ${varBox('horas', s.hrs)}
-              ${varBox('cantidad', s.count)}
-              ${varBox('totalHoras', s.total)}
-            </div>
-            <div class="console">${workerConsole(step)}</div>
+            <div class="condition-box"><span class="condition-expression">${s.test}</span>${s.bool===null?'<span class="bool-pill">—</span>':`<span class="bool-pill ${s.bool?'bool-true':'bool-false'}">${s.bool?'VERDADERO':'FALSO'}</span>`}</div>
+            <div class="var-grid">${varBox('trabajador',s.worker)} ${varBox('horas',s.hrs)} ${varBox('cantidad',s.count)} ${varBox('totalHoras',s.total)}</div>
+            <div class="console">${renderTraceConsole(s.console)}</div>
           </div>
-        </div>
-      `;
+        </div>`;
     },
-    steps: 7
+    steps: buildWorkerTrace().length
   },
   {
     title: "Ejercicio 8 · Hasta 5 aprobados",
-    short: "Contador como condición",
+    short: "Contador como condición · línea por línea",
     render(step) {
-      const seq = ['R','A','R','A','A','A','A'];
-      const shown = seq.slice(0, Math.min(step, seq.length));
-      const approved = shown.filter(x=>x==='A').length;
-      const rejected = shown.filter(x=>x==='R').length;
-      const total = shown.length;
-      const pct = total ? ((approved/total)*100).toFixed(2) : '—';
-      const done = approved >= 5;
+      const trace = buildInspectionTrace();
+      const s = trace[Math.min(step, trace.length - 1)];
+      const code = [
+        `aprobados = 0`,
+        `rechazados = 0`,
+        `<span class="kw">while</span> aprobados &lt; 5:`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;estado = input(<span class="str">"Estado (A/R): "</span>)`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> estado == <span class="str">"A"</span>:`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;aprobados += 1`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">else</span>:`,
+        `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rechazados += 1`,
+        `porcentaje = aprobados / (aprobados + rechazados) * 100`,
+        `print(<span class="str">"Aprobados:"</span>, aprobados)`,
+        `print(<span class="str">"Rechazados:"</span>, rechazados)`,
+        `print(<span class="str">"% Aprobados:"</span>, porcentaje)`
+      ];
       return `
-        <div class="slide-kicker">06 · Ejercicio 8 · Condición por contador</div>
-        <h2 class="slide-title">El ciclo termina cuando <span class="highlight">aprobados llega a 5</span>, no cuando total llega a 5</h2>
-        <div class="logic-board">
+        <div class="slide-kicker">06 · Ejercicio 8 · Ejecución línea por línea</div>
+        <h2 class="slide-title">La condición depende directamente del <span class="highlight">contador aprobados</span></h2>
+        <div class="logic-board compact-exercise">
           <div>
-            <div class="micro-tag" style="margin-bottom:10px">CÓDIGO PYTHON</div>
-            <div class="code">
-              <span class="code-line">aprobados = 0; rechazados = 0</span>
-              <span class="code-line ${!done?'active':''}"><span class="kw">while</span> aprobados &lt; 5:</span>
-              <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;estado = input(<span class="str">"Estado (A/R): "</span>)</span>
-              <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> estado == <span class="str">"A"</span>:</span>
-              <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;aprobados += 1</span>
-              <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">else</span>:</span>
-              <span class="code-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rechazados += 1</span>
-              <span class="code-line ${done?'active':''}">porcentaje = aprobados / (aprobados + rechazados) * 100</span>
-            </div>
-            <div class="pill-row">${seq.map((x,i)=>`<span class="pill ${i<shown.length?'':'muted'}"><strong>${i+1}:</strong> ${i<shown.length?x:'?'}</span>`).join('')}</div>
-            <div class="step-callout"><strong>${done?'Condición alcanzada':'Todavía seguimos'}</strong><span>${done?'El contador aprobados llegó a 5 ⇒ la condición aprobados < 5 se vuelve falsa y el while termina.':'aprobados funciona como contador: aparece en la condición y aumenta dentro del ciclo.'}</span></div>
+            <div class="micro-tag" style="margin-bottom:8px">CÓDIGO PYTHON · LÍNEA ACTUAL</div>
+            <div class="code">${code.map((l,i)=>`<span class="code-line ${i===s.line?'active':''}">${l}</span>`).join('')}</div>
+            <div class="step-callout"><strong>${s.phase}</strong><span>${s.msg}</span></div>
           </div>
           <div class="trace-panel">
-            <div class="condition-box"><span class="condition-expression">${approved} &lt; 5</span><span class="bool-pill ${done?'bool-false':'bool-true'}">${done?'FALSO':'VERDADERO'}</span></div>
-            <div class="var-grid">
-              ${varBox('aprobados', approved)}
-              ${varBox('rechazados', rejected)}
-              ${varBox('total', total)}
-              ${varBox('% aprobados', pct)}
-            </div>
-            <div class="console">${inspectionConsole(step, seq)}</div>
+            <div class="condition-box"><span class="condition-expression">${s.test}</span>${s.bool===null?'<span class="bool-pill">—</span>':`<span class="bool-pill ${s.bool?'bool-true':'bool-false'}">${s.bool?'VERDADERO':'FALSO'}</span>`}</div>
+            <div class="var-grid">${varBox('estado',s.estado)} ${varBox('aprobados',s.approved)} ${varBox('rechazados',s.rejected)} ${varBox('total',s.total)} ${varBox('% aprobados',s.pct)}</div>
+            <div class="console">${renderTraceConsole(s.console)}</div>
           </div>
-        </div>
-      `;
+        </div>`;
     },
-    steps: 8
+    steps: buildInspectionTrace().length
   },
   {
     title: "Mini laboratorio · Tú controlas el while",
